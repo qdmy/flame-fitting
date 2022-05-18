@@ -17,6 +17,8 @@ from os.path import join
 from smpl_webuser.serialization import load_model
 from fitting.landmarks import load_embedding, landmark_error_3d
 from fitting.util import load_binary_pickle, write_simple_obj, safe_mkdir, get_unit_factor
+from fitting.landmarks import load_picked_points
+from lx_fit_scan import compute_approx_scale
 
 # -----------------------------------------------------------------------------
 
@@ -47,7 +49,7 @@ def fit_lmk3d( lmk_3d,                      # input landmark 3d
     pose_idx       = np.union1d(np.arange(3), np.arange(6,9)) # global rotation and jaw rotation
     shape_idx      = np.arange( 0, min(300,shape_num) )        # valid shape component range in "betas": 0-299
     expr_idx       = np.arange( 300, 300+min(100,expr_num) )   # valid expression component range in "betas": 300-399
-    used_idx       = np.union1d( shape_idx, expr_idx )
+    used_idx       = np.union1d( shape_idx, expr_idx ) # 查找两个数组的并集
     model.betas[:] = np.random.rand( model.betas.size ) * 0.0  # initialized to zero
     model.pose[:]  = np.random.rand( model.pose.size ) * 0.0   # initialized to zero
     free_variables = [ model.trans, model.pose[pose_idx], model.betas[used_idx] ] 
@@ -120,23 +122,36 @@ def fit_lmk3d( lmk_3d,                      # input landmark 3d
 
 def run_fitting():
     # input landmarks
-    lmk_path = './data/scan_lmks.npy'
-    # measurement unit of landmarks ['m', 'cm', 'mm']
-    unit = 'm' 
-
-    scale_factor = get_unit_factor('m') / get_unit_factor(unit)
-    lmk_3d = scale_factor*np.load(lmk_path)
-    print("loaded 3d landmark from:", lmk_path)
+    lmk_path = "./data/4.npy" # './data/scan_lmks.npy'
 
     # model
     model_path = './models/generic_model.pkl' # change to 'female_model.pkl' or 'male_model.pkl', if gender is known
     model = load_model(model_path)       # the loaded model object is a 'chumpy' object, check https://github.com/mattloper/chumpy for details
     print("loaded model from:", model_path)
-
+    
     # landmark embedding
     lmk_emb_path = './models/flame_static_embedding.pkl' 
-    lmk_face_idx, lmk_b_coords = load_embedding(lmk_emb_path)
+    lmk_face_idx, lmk_b_coords = load_embedding(lmk_emb_path) # 面片索引，重心坐标
     print("loaded lmk embedding")
+
+    if '.pp' in lmk_path:
+        f = load_picked_points
+    elif '.npy' in lmk_path:
+        f = np.load
+    else:
+        raise Exception
+    lmk_3d = f(lmk_path)[0, -51:] # shape: (51, 3)
+    print("loaded 3d landmark from:", lmk_path)
+
+    # measurement unit of landmarks ['m', 'cm', 'mm']
+    unit = 'NA' 
+    if unit.lower() == 'na':
+        print('No scale specifiec - compute approximate scale based on the landmarks')
+        scale_factor = compute_approx_scale(lmk_3d, model, lmk_face_idx, lmk_b_coords)
+        print('Scale factor: %f' % scale_factor)
+    else:
+        scale_factor = get_unit_factor('m') / get_unit_factor(unit)
+    lmk_3d = scale_factor*lmk_3d
 
     # output
     output_dir = './output'
@@ -175,7 +190,7 @@ def run_fitting():
                                        shape_num=shape_num, expr_num=expr_num, opt_options=opt_options ) # options
 
     # write result
-    output_path = join( output_dir, 'fit_lmk3d_result.obj' )
+    output_path = join( output_dir, '4.obj' )
     write_simple_obj( mesh_v=mesh_v, mesh_f=mesh_f, filepath=output_path, verbose=False )
 
 # -----------------------------------------------------------------------------

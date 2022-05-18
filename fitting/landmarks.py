@@ -10,6 +10,8 @@ More information about FLAME is available at http://flame.is.tue.mpg.de.
 For comments or questions, please email us at flame@tue.mpg.de
 '''
 
+from fileinput import filename
+from zipfile import PyZipFile
 import numpy as np
 import chumpy as ch
 import pickle as pickle
@@ -43,20 +45,20 @@ def load_embedding( file_path ):
     """ funciton: load landmark embedding, in terms of face indices and barycentric coordinates for corresponding landmarks
     note: the included example is corresponding to CMU IntraFace 49-point landmark format.
     """
-    lmk_indexes_dict = load_binary_pickle( file_path )
+    lmk_indexes_dict = load_binary_pickle( file_path ) # 文件里保存的是每个landmark所在的面片index和中心坐标
     lmk_face_idx = lmk_indexes_dict[ 'lmk_face_idx' ].astype( np.uint32 )
     lmk_b_coords = lmk_indexes_dict[ 'lmk_b_coords' ]
     return lmk_face_idx, lmk_b_coords
 
 # -----------------------------------------------------------------------------
 
-def mesh_points_by_barycentric_coordinates( mesh_verts, mesh_faces, lmk_face_idx, lmk_b_coords ):
+def mesh_points_by_barycentric_coordinates( mesh_verts, mesh_faces, lmk_face_idx, lmk_b_coords ): # mesh_faces里保存的是每个face的三个顶点index
     """ function: evaluation 3d points given mesh and landmark embedding
     """
-    dif1 = ch.vstack([(mesh_verts[mesh_faces[lmk_face_idx], 0] * lmk_b_coords).sum(axis=1),
+    dif1 = ch.vstack([(mesh_verts[mesh_faces[lmk_face_idx], 0] * lmk_b_coords).sum(axis=1), # 顶点坐标*所在面片的重心坐标再求和，得到每个landmark对应的顶点的坐标
                     (mesh_verts[mesh_faces[lmk_face_idx], 1] * lmk_b_coords).sum(axis=1),
                     (mesh_verts[mesh_faces[lmk_face_idx], 2] * lmk_b_coords).sum(axis=1)]).T
-    return dif1
+    return dif1 # shape: (51, 3),
 
 # -----------------------------------------------------------------------------
 
@@ -69,10 +71,10 @@ def landmark_error_3d( mesh_verts, mesh_faces, lmk_3d, lmk_face_idx, lmk_b_coord
     lmk_num  = lmk_face_idx.shape[0]
 
     # an index to select which landmark to use
-    lmk_selection = np.arange(0,lmk_num).ravel() # use all
+    lmk_selection = np.arange(0,lmk_num).ravel() # use all, 就是把输入拉平
 
     # residual vectors
-    lmk3d_obj = weight * ( v_selected[lmk_selection] - lmk_3d[lmk_selection] )
+    lmk3d_obj = weight * ( v_selected[lmk_selection] - lmk_3d[lmk_selection] ) # 根据flame提供的landmark所在face和重心坐标算出的template上的landmark，与指定landmark的距离
 
     return lmk3d_obj
 
@@ -109,3 +111,9 @@ def load_picked_points(filename):
             pickedPoints.append(get_point([str[ix], str[iy], str[iz]]))
     f.close()
     return np.array(pickedPoints)
+
+
+if __name__ == "__main__":
+    ppfile = 'data/3_face2_picked_points.pp'
+    res = load_picked_points(ppfile)
+    np.save(ppfile.replace('.pp', '.npy'), res)
