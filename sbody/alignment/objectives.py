@@ -37,7 +37,7 @@ def sample_from_mesh(mesh, sample_type='edge_midpoints', num_samples=10000, vert
     # print 'WARNING: sample_from_mesh needs testing, especially with edge-midpoints and uniformly-at-random'
     if sample_type == 'vertices':
         if vertex_indices_to_sample is None:
-            sample_spec = {'point2sample': sy.sparse.eye(mesh.v.size, mesh.v.size)}  # @UndefinedVariable
+            sample_spec = {'point2sample': sy.sparse.eye(mesh.v.size, mesh.v.size)}  # @UndefinedVariable # 返回v.size * v.size 大小的矩阵，对角线为1，其余为0
         else:
             sample_ind = vertex_indices_to_sample
             IS = co3(array(range(0, sample_ind.size)))

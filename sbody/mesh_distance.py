@@ -16,18 +16,18 @@ def ScanToMesh(scan, mesh_verts, mesh_faces, rho=lambda x : x, scan_sampler=None
     if scan_sampler is None:
         scan_sampler = scan
 
-    sampler, n_samples = construct_sampler(scan_sampler, scan.v.size / 3)
+    sampler, n_samples = construct_sampler(scan_sampler, scan.v.size / 3) # sampler是一个num_v*num_v的单位矩阵，n_samples表示只采样sampler里所有点数量的1/3
 
     norm_const = np.sqrt(n_samples) if normalize else 1
 
     if signed:
         fn = lambda x : SignedSqrt(rho(x)) / norm_const
     else:
-        fn = lambda x : ch.sqrt(rho(x)) / norm_const
+        fn = lambda x : ch.sqrt(rho(x)) / norm_const # 这里的 x 在后面就是一个 MeshDistanceSquared 的对象
 
-    result = Ch(lambda mesh_verts : fn(MeshDistanceSquared(
+    result = Ch(lambda mesh_verts : fn(MeshDistanceSquared( # 初始化了一个MeshDistanceSquared的对象作为fn的参数
         sample_verts=scan.v,
-        sample_faces=scan.f,
+        sample_faces=scan.f if hasattr(scan, 'f') else None,
         reference_verts=mesh_verts,
         reference_faces=mesh_faces,
         sampler=sampler,
@@ -35,7 +35,7 @@ def ScanToMesh(scan, mesh_verts, mesh_faces, rho=lambda x : x, scan_sampler=None
         )))
 
     result.mesh_verts = mesh_verts
-    return result
+    return result # 是一个chumpy对象，包含着 ch.sqrt(rho(MeshDistanceSquared())) / norm_const 的值
 
 def MeshToScan(scan, mesh_verts, mesh_faces, mesh_template_or_sampler, rho=lambda x : x, normalize=True, signed=False):
     """Returns a Ch object whose only dterm is 'mesh_verts'"""

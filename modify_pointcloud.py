@@ -1,4 +1,3 @@
-from sys import stderr
 import numpy as np
 from os.path import join
 from psbody.mesh import Mesh
@@ -7,6 +6,8 @@ from fitting.util import load_binary_pickle, write_simple_obj, safe_mkdir, get_u
 import open3d as o3d
 import argparse, os
 from tqdm import tqdm
+import logging
+logger = logging.getLogger(__name__)
 
 def get_config():
     parser = argparse.ArgumentParser(description='modify mean and std and orientation')
@@ -139,15 +140,15 @@ def get_lmk_meanstd(lmk):
 
 # 只需要旋转并平移一下就ok了，调这个函数
 def liuxu_modify_basedon_lmk():
-    eg = './data/scan.obj'
-    lmk = './data/scan_lmks.npy'
+    eg = 'data/scan.obj'
+    lmk = 'data/scan_lmks.npy'
     eg_lmk = np.load(lmk)
     eg_mean, eg_std = get_lmk_meanstd(eg_lmk) # mean x-y-z分开算, std整体算
     print(f'my example lmk mean: {eg_mean}, std: {eg_std}')
 
-    my_scan = "/mnt/cephfs/home/liuxu/cvte/tools/flame-fitting/data/new_cap/mesh/0_face.obj"
-    my_lmk = "/mnt/cephfs/home/liuxu/cvte/tools/flame-fitting/data/new_cap/lmk/0_face.npy"
-    lmk = np.load(my_lmk)[-51:]
+    my_scan = "data/lizhenliang2/lizhenliang2_down10.ply"
+    my_lmk = "data/lizhenliang2/lizhenliang2_picked_points.pp"
+    lmk = get_lmk(my_lmk)[-51:]
     mean, std = get_lmk_meanstd(lmk)
     mesh = Mesh(filename=my_scan)
     v = mesh.v
@@ -159,8 +160,8 @@ def liuxu_modify_basedon_lmk():
 
     v_transl = transl(v, mean, eg_mean) # 到这一步得到的obj，fit效果最好
     lmk_transl = transl(lmk, mean, eg_mean)
-    write_simple_obj(v_transl, mesh.f if hasattr(mesh, 'f') else None, my_scan.replace('.obj', '_x_transl_by_lmk.obj'))
-    np.save(my_lmk.replace('.npy', '_x_transl_by_lmk.npy'), lmk_transl)
+    write_simple_obj(v_transl, mesh.f if hasattr(mesh, 'f') else None, my_scan.replace('.ply', '_x_transl_by_lmk.obj'))
+    np.save(my_lmk.replace('.pp', '_x_transl_by_lmk.npy'), lmk_transl)
     mean_transl, std_transl = get_lmk_meanstd(lmk_transl)
     print(f'my transla lmk mean: {mean_transl}, std: {std_transl}')
 
@@ -229,6 +230,39 @@ def stupid_test():
                 # o3d.visualization.draw_geometries([res_mesh, res_lmk, eg_mesh])
 
                 
+
+
+# 只需要旋转并平移一下就ok了，调这个函数
+def modify(my_scan, my_lmk):
+    eg = 'data/scan.obj'
+    lmk = 'data/scan_lmks.npy'
+    eg_lmk = np.load(lmk)
+    eg_mean, eg_std = get_lmk_meanstd(eg_lmk) # mean x-y-z分开算, std整体算
+    logger.info(f'my example lmk mean: {eg_mean}, std: {eg_std}')
+
+    lmk = get_lmk(my_lmk)[-51:]
+    mean, std = get_lmk_meanstd(lmk)
+    mesh = Mesh(filename=my_scan)
+    v = mesh.v
+    logger.info(f'my origina lmk mean: {mean}, std: {std}')
+
+    v = x_rotate(v)
+    lmk = x_rotate(lmk)
+    mean, std = get_lmk_meanstd(lmk)
+
+    v_transl = transl(v, mean, eg_mean) # 到这一步得到的obj，fit效果最好
+    lmk_transl = transl(lmk, mean, eg_mean)
+    write_simple_obj(v_transl, mesh.f if hasattr(mesh, 'f') else None, my_scan.replace('.ply', '_x_transl_by_lmk.obj'))
+    np.save(my_lmk.replace('.pp', '_x_transl_by_lmk.npy'), lmk_transl)
+    mean_transl, std_transl = get_lmk_meanstd(lmk_transl)
+    logger.info(f'my transla lmk mean: {mean_transl}, std: {std_transl}')
+
+    trans = -mean + eg_mean
+    logger.info(f"trans: {trans}")
+
+    return my_scan.replace('.ply', '_x_transl_by_lmk.obj'), my_lmk.replace('.pp', '_x_transl_by_lmk.npy'), trans
+
+
 
 if __name__ == '__main__':
     # flamefit_test()
